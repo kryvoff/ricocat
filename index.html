@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rico Cat</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="game-layout">
+  <canvas id="game" width="640" height="640"></canvas>
+
+  <div id="sidebar">
+    <h1>Rico Cat</h1>
+    <div class="subtitle">A Ricochet Robots game with cats!</div>
+
+    <div id="scoreboard">
+      <div class="score score-pauli">
+        <img src="assets/pauli.png" alt="Pauli" class="score-avatar">
+        <div class="score-info">
+          <span class="score-name">Pauli</span>
+          <span class="score-points" id="score-pauli">0</span>
+        </div>
+      </div>
+      <div class="score score-semi">
+        <img src="assets/samy.png" alt="Samy" class="score-avatar">
+        <div class="score-info">
+          <span class="score-name">Samy</span>
+          <span class="score-points" id="score-semi">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="message">Press any key to start!</div>
+
+    <div id="controls">
+      <div class="control-group">
+        <div class="control-header">
+          <img src="assets/pauli.png" alt="Pauli" class="control-avatar">
+          <h3>Pauli</h3>
+        </div>
+        <div class="keys">
+          <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>
+        </div>
+      </div>
+      <div class="control-group">
+        <div class="control-header">
+          <img src="assets/samy.png" alt="Samy" class="control-avatar">
+          <h3>Samy</h3>
+        </div>
+        <div class="keys">
+          <span class="key">↑</span><span class="key">←</span><span class="key">↓</span><span class="key">→</span>
+        </div>
+      </div>
+      <div class="control-group">
+        <div class="control-header">
+          <h3>Special</h3>
+        </div>
+        <div class="keys">
+          <span class="key key-wide">Space</span><span class="key key-wide">Enter</span>
+        </div>
+        <div class="key-desc">Teleport Jerry / Reset Game</div>
+      </div>
+    </div>
+
+    <button id="restart-btn" onclick="restartGame()">New Game</button>
+
+    <div id="round-info">First to <strong>3</strong> catches wins!</div>
+
+    <div id="volume-controls">
+      <div class="volume-control">
+        <label for="music-volume">🎵 Music</label>
+        <input type="range" id="music-volume" min="0" max="100" value="20">
+        <span id="music-value">20%</span>
+      </div>
+      <div class="volume-control">
+        <label for="sfx-volume">🔊 SFX</label>
+        <input type="range" id="sfx-volume" min="0" max="100" value="30">
+        <span id="sfx-value">30%</span>
+      </div>
+      <div class="volume-control">
+        <label for="board-size">🎯 Board Size</label>
+        <input type="range" id="board-size" min="8" max="15" value="10">
+        <span id="board-value">10×10</span>
+      </div>
+      <div class="volume-control">
+        <label for="relocate-time">⏱️ Relocate Time (s)</label>
+        <input type="number" id="relocate-time" min="3" max="30" value="8" step="1">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>

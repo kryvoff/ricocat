@@ -1,0 +1,254 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #eee;
+}
+
+#game-layout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  padding: 1.5rem;
+}
+
+canvas {
+  border: 4px solid #5a5a7a;
+  border-radius: 6px;
+  background: #d4cfc4;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+
+/* --- Sidebar --- */
+
+#sidebar {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+h1 {
+  font-size: 2rem;
+  color: #f5a623;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: -0.6rem;
+}
+
+/* --- Scoreboard --- */
+
+#scoreboard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.score-pauli { background: rgba(245, 166, 35, 0.2); border: 2px solid #f5a623; }
+.score-semi  { background: rgba(100, 180, 255, 0.2); border: 2px solid #64b4ff; }
+
+.score-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.score-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.score-name {
+  font-size: 1rem;
+  color: #ccc;
+}
+
+.score-points {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+/* --- Message --- */
+
+#message {
+  font-size: 1.1rem;
+  min-height: 2.4rem;
+  color: #ffd700;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+/* --- Controls --- */
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.control-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.control-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.control-group h3 {
+  font-size: 0.9rem;
+  color: #bbb;
+}
+
+.keys {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #2a2a4e;
+  border: 1px solid #555;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  color: #ddd;
+  font-weight: bold;
+}
+
+.key-wide {
+  width: auto;
+  padding: 0 10px;
+}
+
+.key-desc {
+  font-size: 0.75rem;
+  color: #777;
+  margin-top: 0.2rem;
+}
+
+/* --- Buttons --- */
+
+#restart-btn {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  background: #f5a623;
+  color: #1a1a2e;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#restart-btn:hover { background: #ffc04d; }
+
+#round-info {
+  font-size: 0.85rem;
+  color: #777;
+}
+
+/* --- Volume Controls --- */
+
+#volume-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.volume-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.volume-control label {
+  font-size: 0.85rem;
+  color: #bbb;
+  font-weight: bold;
+}
+
+.volume-control input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #2a2a4e;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f5a623;
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f5a623;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+}
+
+.volume-control span {
+  font-size: 0.75rem;
+  color: #888;
+  text-align: right;
+}
+
+.volume-control input[type="number"] {
+  width: 100%;
+  padding: 0.4rem;
+  background: #2a2a4e;
+  border: 1px solid #555;
+  border-radius: 5px;
+  color: #ddd;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.volume-control input[type="number"]:focus {
+  outline: none;
+  border-color: #f5a623;
+}
