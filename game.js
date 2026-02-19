@@ -300,13 +300,15 @@ function addWall(r, c, side) {
 }
 
 function generateRandomWalls() {
-  const numPairs = 14 + Math.floor(Math.random() * 6);
   const combos = [
     ['top', 'right'], ['top', 'left'],
     ['bottom', 'right'], ['bottom', 'left'],
     ['right', 'top'], ['right', 'bottom'],
     ['left', 'top'], ['left', 'bottom']
   ];
+
+  // Interior L-shaped wall pairs
+  const numPairs = 12 + Math.floor(Math.random() * 5);
   for (let i = 0; i < numPairs; i++) {
     const r = 1 + Math.floor(Math.random() * (ROWS - 2));
     const c = 1 + Math.floor(Math.random() * (COLS - 2));
@@ -314,6 +316,57 @@ function generateRandomWalls() {
     addWall(r, c, combo[0]);
     addWall(r, c, combo[1]);
   }
+
+  // Edge notch walls: dividers along the outer border so cats sliding
+  // along the edge can stop at irregular intervals, making interior
+  // cells reachable by a subsequent perpendicular slide.
+  // Top/bottom rows: notches on left or right side of a border cell
+  const notchH = 2 + Math.floor(COLS / 3);
+  const usedTop = new Set(), usedBottom = new Set();
+  for (let i = 0; i < notchH; i++) {
+    let c = 1 + Math.floor(Math.random() * (COLS - 2));
+    if (!usedTop.has(c)) { addWall(0, c, Math.random() < 0.5 ? 'right' : 'left'); usedTop.add(c); }
+    c = 1 + Math.floor(Math.random() * (COLS - 2));
+    if (!usedBottom.has(c)) { addWall(ROWS - 1, c, Math.random() < 0.5 ? 'right' : 'left'); usedBottom.add(c); }
+  }
+  // Left/right columns: notches on top or bottom side of a border cell
+  const notchV = 2 + Math.floor(ROWS / 3);
+  const usedLeft = new Set(), usedRight = new Set();
+  for (let i = 0; i < notchV; i++) {
+    let r = 1 + Math.floor(Math.random() * (ROWS - 2));
+    if (!usedLeft.has(r)) { addWall(r, 0, Math.random() < 0.5 ? 'top' : 'bottom'); usedLeft.add(r); }
+    r = 1 + Math.floor(Math.random() * (ROWS - 2));
+    if (!usedRight.has(r)) { addWall(r, COLS - 1, Math.random() < 0.5 ? 'top' : 'bottom'); usedRight.add(r); }
+  }
+}
+
+// Generate walls and retry until ≥80% of non-center cells are reachable
+// via ricochet from any corner. Guarantees the mouse always has good spots.
+function generateWallsWithCoverage() {
+  const cellKey = (r, c) => r * COLS + c;
+  const cx = Math.floor(COLS / 2) - 1;
+  const cy = Math.floor(ROWS / 2) - 1;
+  const tempCenter = new Set([
+    cellKey(cy, cx), cellKey(cy, cx + 1),
+    cellKey(cy + 1, cx), cellKey(cy + 1, cx + 1)
+  ]);
+  const usable = ROWS * COLS - tempCenter.size;
+
+  for (let attempt = 0; attempt < 25; attempt++) {
+    initWalls();
+    generateRandomWalls();
+
+    // Measure reachability from two opposing corners
+    const r1 = ricochetReachable(0, 0, -1, -1);
+    const r2 = ricochetReachable(ROWS - 1, COLS - 1, -1, -1);
+    const union = new Set([...r1, ...r2]);
+    for (const k of tempCenter) union.delete(k);
+
+    if (union.size / usable >= 0.80) return; // good board
+  }
+  // Fallback: accept whatever we have after final attempt
+  initWalls();
+  generateRandomWalls();
 }
 
 // ---- Ricochet slide computation (from a given cell) ----
@@ -981,8 +1034,7 @@ function initGame() {
   scheduleMeow();
   startMusic();
 
-  initWalls();
-  generateRandomWalls();
+  generateWallsWithCoverage();
 
   // Block center 2x2
   const cx = Math.floor(COLS / 2) - 1;
