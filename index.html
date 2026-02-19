@@ -9,11 +9,49 @@
 <body>
 
 <div id="game-layout">
+  <!-- Left panel: settings -->
+  <div id="left-panel">
+    <h2>⚙️ Settings</h2>
+    <button id="restart-btn" onclick="restartGame()">🎮 New Game</button>
+    <div class="setting-control">
+      <label for="board-size">🎯 Board Size</label>
+      <div class="slider-row">
+        <input type="range" id="board-size" min="8" max="15" value="10">
+        <span id="board-value">10×10</span>
+      </div>
+    </div>
+    <div class="setting-control">
+      <label for="relocate-time">⏱️ Relocate (s)</label>
+      <input type="number" id="relocate-time" min="3" max="30" value="8" step="1">
+    </div>
+    <div class="setting-control">
+      <label for="music-volume">🎵 Music</label>
+      <div class="slider-row">
+        <input type="range" id="music-volume" min="0" max="100" value="20">
+        <span id="music-value">20%</span>
+      </div>
+    </div>
+    <div class="setting-control">
+      <label for="sfx-volume">🔊 SFX</label>
+      <div class="slider-row">
+        <input type="range" id="sfx-volume" min="0" max="100" value="30">
+        <span id="sfx-value">30%</span>
+      </div>
+    </div>
+    <div id="game-legend">
+      <div class="legend-title">Power-ups</div>
+      <div class="legend-item">🍒 Cherry — land on it for +1</div>
+      <div class="legend-item">⭐ Golden Jerry — catch for +2</div>
+      <div class="legend-item">🐱 Tom — use him as a wall!</div>
+    </div>
+  </div>
+
   <canvas id="game" width="640" height="640"></canvas>
 
-  <div id="sidebar">
+  <!-- Right panel: scores & controls -->
+  <div id="right-panel">
     <h1>Rico Cat</h1>
-    <div class="subtitle">A Ricochet Robots game with cats!</div>
+    <div class="subtitle">Ricochet Robots with cats!</div>
 
     <div id="scoreboard">
       <div class="score score-pauli">
@@ -54,41 +92,15 @@
         </div>
       </div>
       <div class="control-group">
-        <div class="control-header">
-          <h3>Special</h3>
-        </div>
+        <div class="control-header"><h3>Special</h3></div>
         <div class="keys">
           <span class="key key-wide">Space</span><span class="key key-wide">Enter</span>
         </div>
-        <div class="key-desc">Teleport Jerry / Reset Game</div>
+        <div class="key-desc">Teleport Jerry / Reset</div>
       </div>
     </div>
-
-    <button id="restart-btn" onclick="restartGame()">New Game</button>
 
     <div id="round-info">First to <strong>3</strong> catches wins!</div>
-
-    <div id="volume-controls">
-      <div class="volume-control">
-        <label for="music-volume">🎵 Music</label>
-        <input type="range" id="music-volume" min="0" max="100" value="20">
-        <span id="music-value">20%</span>
-      </div>
-      <div class="volume-control">
-        <label for="sfx-volume">🔊 SFX</label>
-        <input type="range" id="sfx-volume" min="0" max="100" value="30">
-        <span id="sfx-value">30%</span>
-      </div>
-      <div class="volume-control">
-        <label for="board-size">🎯 Board Size</label>
-        <input type="range" id="board-size" min="8" max="15" value="10">
-        <span id="board-value">10×10</span>
-      </div>
-      <div class="volume-control">
-        <label for="relocate-time">⏱️ Relocate Time (s)</label>
-        <input type="number" id="relocate-time" min="3" max="30" value="8" step="1">
-      </div>
-    </div>
   </div>
 </div>
 

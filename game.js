@@ -235,6 +235,32 @@ function setMusicUrgentMode() {
   newMelody();
 }
 
+function playCherrySound() {
+  const t = audioCtx.currentTime;
+  [880, 1047, 1319].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t + i * 0.07);
+    g.gain.setValueAtTime(0.15, t + i * 0.07);
+    g.gain.linearRampToValueAtTime(0, t + i * 0.07 + 0.12);
+    osc.connect(g).connect(sfxGainNode);
+    osc.start(t + i * 0.07); osc.stop(t + i * 0.07 + 0.15);
+  });
+}
+
+function playGoldenCatchSound() {
+  const t = audioCtx.currentTime;
+  [523, 659, 784, 1047, 1319].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, t + i * 0.08);
+    g.gain.setValueAtTime(0.18, t + i * 0.08);
+    g.gain.linearRampToValueAtTime(0, t + i * 0.08 + 0.18);
+    osc.connect(g).connect(sfxGainNode);
+    osc.start(t + i * 0.08); osc.stop(t + i * 0.08 + 0.2);
+  });
+}
+
 // Random meow timer
 let meowTimer = 0;
 function scheduleMeow() {
@@ -272,6 +298,22 @@ let mouseDisappearing = false;
 // Urgency mode (after 5 seconds, switch to single-step movement)
 let urgencyMode = false;
 let urgencyModeTimer = 5;
+
+// Tom: AI wandering cat — acts as ricochet blocker
+let tom = { row: 0, col: 0, color: '#6688aa', name: 'Tom' };
+let tomAnim = { active: false, shakeTime: 0, shakeDir: {dr:0, dc:0} };
+let tomActive = false;
+let tomMoveTimer = 3;
+
+// Cherry: bonus collectible item
+let cherry = { row: -1, col: -1, active: false };
+let cherryTimer = 0;
+let cherrySpawnTimer = 18;
+
+// Golden Jerry: catching him scores +2
+let mouseGolden = false;
+let mouseGoldenTimer = 0;
+let mouseGoldenSpawnTimer = 22;
 
 // ---- Wall generation ----
 
@@ -357,8 +399,8 @@ function generateWallsWithCoverage() {
     generateRandomWalls();
 
     // Measure reachability from two opposing corners
-    const r1 = ricochetReachable(0, 0, -1, -1);
-    const r2 = ricochetReachable(ROWS - 1, COLS - 1, -1, -1);
+    const r1 = ricochetReachable(0, 0, []);
+    const r2 = ricochetReachable(ROWS - 1, COLS - 1, []);
     const union = new Set([...r1, ...r2]);
     for (const k of tempCenter) union.delete(k);
 
@@ -371,7 +413,8 @@ function generateWallsWithCoverage() {
 
 // ---- Ricochet slide computation (from a given cell) ----
 
-function slideFrom(fromRow, fromCol, dRow, dCol, blockerRow, blockerCol) {
+// blockers = [{row, col}, ...] — all entities that stop a slide
+function slideFrom(fromRow, fromCol, dRow, dCol, blockers) {
   let r = fromRow;
   let c = fromCol;
   while (true) {
@@ -386,7 +429,7 @@ function slideFrom(fromRow, fromCol, dRow, dCol, blockerRow, blockerCol) {
     if (dRow ===  1 && walls[nr][nc].top)    break;
     if (dCol === -1 && walls[nr][nc].right)  break;
     if (dCol ===  1 && walls[nr][nc].left)   break;
-    if (nr === blockerRow && nc === blockerCol) break;
+    if (blockers.some(b => Math.round(b.row) === nr && Math.round(b.col) === nc)) break;
     r = nr; c = nc;
   }
   return { row: r, col: c };
@@ -394,7 +437,7 @@ function slideFrom(fromRow, fromCol, dRow, dCol, blockerRow, blockerCol) {
 
 // ---- Ricochet reachability (BFS over ricochet moves) ----
 
-function ricochetReachable(startRow, startCol, blockerRow, blockerCol) {
+function ricochetReachable(startRow, startCol, blockers) {
   // Returns a Set of cell keys reachable by ricochet sliding
   const visited = new Set();
   const key = (r, c) => r * COLS + c;
@@ -405,7 +448,7 @@ function ricochetReachable(startRow, startCol, blockerRow, blockerCol) {
   while (queue.length > 0) {
     const { row, col } = queue.shift();
     for (const [dRow, dCol] of dirs) {
-      const dest = slideFrom(row, col, dRow, dCol, blockerRow, blockerCol);
+      const dest = slideFrom(row, col, dRow, dCol, blockers);
       const k = key(dest.row, dest.col);
       if (!visited.has(k)) {
         visited.add(k);
@@ -435,9 +478,12 @@ function cooperativeReachable(pauliRow, pauliCol, semiRow, semiCol) {
   while (queue.length > 0) {
     const { pr, pc, sr, sc } = queue.shift();
 
-    // Try moving Pauli in each direction (Semi is blocker)
+    // Fixed blocker: Tom (if active) doesn't move in this state search
+    const tomB = tomActive ? [{ row: Math.round(tom.row), col: Math.round(tom.col) }] : [];
+
+    // Try moving Pauli in each direction (Semi + Tom are blockers)
     for (const [dRow, dCol] of dirs) {
-      const dest = slideFrom(pr, pc, dRow, dCol, sr, sc);
+      const dest = slideFrom(pr, pc, dRow, dCol, [{ row: sr, col: sc }, ...tomB]);
       const sk = stateKey(dest.row, dest.col, sr, sc);
       if (!visited.has(sk)) {
         visited.add(sk);
@@ -446,9 +492,9 @@ function cooperativeReachable(pauliRow, pauliCol, semiRow, semiCol) {
       }
     }
 
-    // Try moving Semi in each direction (Pauli is blocker)
+    // Try moving Semi in each direction (Pauli + Tom are blockers)
     for (const [dRow, dCol] of dirs) {
-      const dest = slideFrom(sr, sc, dRow, dCol, pr, pc);
+      const dest = slideFrom(sr, sc, dRow, dCol, [{ row: pr, col: pc }, ...tomB]);
       const sk = stateKey(pr, pc, dest.row, dest.col);
       if (!visited.has(sk)) {
         visited.add(sk);
@@ -513,7 +559,9 @@ function placeMouse() {
   mouseDisappearing = false;
   urgencyMode = false;
   urgencyModeTimer = 5;
-  
+  mouseGolden = false;
+  mouseGoldenSpawnTimer = 18 + Math.random() * 14;
+
   // Reset music to normal game mode
   if (gameStarted && !gameOver) {
     setMusicGameMode();
@@ -524,10 +572,12 @@ function placeMouse() {
 
 function computeSlide(player, dRow, dCol) {
   const other = player === pauli ? semi : pauli;
+  const blockers = [{ row: Math.round(other.row), col: Math.round(other.col) }];
+  if (tomActive) blockers.push({ row: Math.round(tom.row), col: Math.round(tom.col) });
   return slideFrom(
     Math.round(player.row), Math.round(player.col),
     dRow, dCol,
-    Math.round(other.row), Math.round(other.col)
+    blockers
   );
 }
 
@@ -557,6 +607,8 @@ function startSlide(player, anim, dRow, dCol) {
     const or = Math.round(other.row);
     const oc = Math.round(other.col);
     if (nr === or && nc === oc) return;
+    // Check for Tom blocking in single-step mode
+    if (tomActive && nr === Math.round(tom.row) && nc === Math.round(tom.col)) return;
     
     target = { row: nr, col: nc };
   } else {
@@ -625,29 +677,237 @@ function updateAnim(player, anim, dt) {
   }
 }
 
+// ---- Tom AI cat ----
+
+function placeTom() {
+  const candidates = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (centerCells.has(r * COLS + c)) continue;
+      if (r === Math.round(pauli.row) && c === Math.round(pauli.col)) continue;
+      if (r === Math.round(semi.row)  && c === Math.round(semi.col))  continue;
+      if (r === mouse.row && c === mouse.col) continue;
+      candidates.push({ row: r, col: c });
+    }
+  }
+  if (candidates.length > 0) {
+    const p = candidates[Math.floor(Math.random() * candidates.length)];
+    tom.row = p.row; tom.col = p.col;
+  }
+  tomActive = true;
+  tomAnim = { active: false, shakeTime: 0, shakeDir: {dr:0, dc:0} };
+  tomMoveTimer = 3;
+}
+
+function startTomSlide(dRow, dCol) {
+  const tr = Math.round(tom.row), tc = Math.round(tom.col);
+  const blockers = [
+    { row: Math.round(pauli.row), col: Math.round(pauli.col) },
+    { row: Math.round(semi.row),  col: Math.round(semi.col)  }
+  ];
+  const target = slideFrom(tr, tc, dRow, dCol, blockers);
+  const dist = Math.abs(target.row - tr) + Math.abs(target.col - tc);
+  if (dist === 0) return false;
+  tomAnim.active = true;
+  tomAnim.startRow = tr; tomAnim.startCol = tc;
+  tomAnim.targetRow = target.row; tomAnim.targetCol = target.col;
+  tomAnim.progress = 0; tomAnim.totalDist = dist;
+  tomAnim.dRow = dRow; tomAnim.dCol = dCol;
+  tomAnim.shakeTime = 0;
+  tom.row = tr; tom.col = tc;
+  return true;
+}
+
+function updateTomAnim(dt) {
+  if (!tomAnim.active && tomAnim.shakeTime <= 0) return;
+  if (tomAnim.shakeTime > 0) {
+    tomAnim.shakeTime -= dt;
+    if (tomAnim.shakeTime <= 0) tomAnim.shakeTime = 0;
+  }
+  if (!tomAnim.active) return;
+  tomAnim.progress += SLIDE_SPEED * 0.55 * dt; // Tom slides slower than cats
+  if (tomAnim.progress >= tomAnim.totalDist) {
+    tomAnim.progress = tomAnim.totalDist;
+    tomAnim.active = false;
+    tom.row = tomAnim.targetRow; tom.col = tomAnim.targetCol;
+    tomAnim.shakeTime = 0.18;
+    tomAnim.shakeDir = { dr: tomAnim.dRow, dc: tomAnim.dCol };
+  } else {
+    tom.row = tomAnim.startRow + tomAnim.dRow * tomAnim.progress;
+    tom.col = tomAnim.startCol + tomAnim.dCol * tomAnim.progress;
+  }
+}
+
+function updateTom(dt) {
+  if (!gameStarted || gameOver || !tomActive) return;
+  updateTomAnim(dt);
+  if (tomAnim.active) return;
+  tomMoveTimer -= dt;
+  if (tomMoveTimer <= 0) {
+    tomMoveTimer = 2 + Math.random() * 2.5;
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    // shuffle
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+    for (const [dr, dc] of dirs) {
+      if (startTomSlide(dr, dc)) break;
+    }
+  }
+}
+
+function drawTom() {
+  if (!tomActive) return;
+  let px = tom.col * CELL + CELL / 2;
+  let py = tom.row * CELL + CELL / 2;
+  if (tomAnim.shakeTime > 0) {
+    const intensity = tomAnim.shakeTime / 0.18;
+    const shake = Math.sin(tomAnim.shakeTime * 60) * 3 * intensity;
+    px += tomAnim.shakeDir.dc * shake;
+    py += tomAnim.shakeDir.dr * shake;
+  }
+  const rad = CELL * 0.32;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(px + 2, py + 3, rad, rad * 0.65, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  ctx.fillStyle = '#4a6a88';
+  [[px - rad * 0.55, py - rad * 0.65, px - rad * 0.1,  py - rad * 1.2,  px - rad * 0.05, py - rad * 0.6],
+   [px + rad * 0.55, py - rad * 0.65, px + rad * 0.1,  py - rad * 1.2,  px + rad * 0.05, py - rad * 0.6]
+  ].forEach(([x1,y1,x2,y2,x3,y3]) => {
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.fill();
+  });
+
+  // Body
+  ctx.fillStyle = '#6688aa';
+  ctx.beginPath();
+  ctx.arc(px, py, rad, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Angry brows
+  ctx.strokeStyle = '#334455'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(px - rad*0.55, py - rad*0.35); ctx.lineTo(px - rad*0.1, py - rad*0.22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px + rad*0.55, py - rad*0.35); ctx.lineTo(px + rad*0.1, py - rad*0.22); ctx.stroke();
+
+  // Eyes
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath(); ctx.ellipse(px - rad*0.3, py - rad*0.05, rad*0.2, rad*0.15, -0.25, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px + rad*0.3, py - rad*0.05, rad*0.2, rad*0.15,  0.25, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.ellipse(px - rad*0.28, py - rad*0.05, rad*0.09, rad*0.13, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px + rad*0.28, py - rad*0.05, rad*0.09, rad*0.13, 0, 0, Math.PI*2); ctx.fill();
+
+  // Whiskers
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+  [[-1,1],[-1,-1],[1,1],[1,-1]].forEach(([sx,sy]) => {
+    ctx.beginPath();
+    ctx.moveTo(px + sx*rad*0.3, py + rad*0.25);
+    ctx.lineTo(px + sx*rad*0.85, py + sy*rad*0.1);
+    ctx.stroke();
+  });
+
+  // Name
+  ctx.fillStyle = '#223344';
+  ctx.font = `bold ${CELL * 0.2}px sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('Tom', px, py + rad + 1);
+}
+
+// ---- Cherry bonus item ----
+
+function placeCherry() {
+  const cellKey = (r, c) => r * COLS + c;
+  const candidates = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (centerCells.has(cellKey(r, c))) continue;
+      if (r === Math.round(pauli.row) && c === Math.round(pauli.col)) continue;
+      if (r === Math.round(semi.row)  && c === Math.round(semi.col))  continue;
+      if (r === mouse.row && c === mouse.col) continue;
+      if (tomActive && r === Math.round(tom.row) && c === Math.round(tom.col)) continue;
+      candidates.push({ row: r, col: c });
+    }
+  }
+  if (candidates.length > 0) {
+    const p = candidates[Math.floor(Math.random() * candidates.length)];
+    cherry.row = p.row; cherry.col = p.col; cherry.active = true;
+    cherryTimer = 10;
+  }
+}
+
+function drawCherry() {
+  if (!cherry.active) return;
+  const px = cherry.col * CELL + CELL / 2;
+  const py = cherry.row * CELL + CELL / 2;
+  const r  = CELL * 0.2;
+  const alpha = cherryTimer < 3 ? cherryTimer / 3 : 1;
+  const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.007);
+  ctx.globalAlpha = alpha;
+
+  // Stem
+  ctx.strokeStyle = '#2d6a1b'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(px, py - r);
+  ctx.quadraticCurveTo(px + r*1.4, py - r*2.6, px + r*0.5, py - r*2.1);
+  ctx.stroke();
+
+  // Berry
+  ctx.fillStyle = '#cc1111';
+  ctx.beginPath(); ctx.arc(px, py, r * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.beginPath(); ctx.arc(px - r*0.3, py - r*0.3, r*0.38, 0, Math.PI * 2); ctx.fill();
+
+  ctx.globalAlpha = 1;
+}
+
 // ---- Check round ----
 
 function checkMouseCaught(player) {
-  if (Math.round(player.row) === mouse.row && Math.round(player.col) === mouse.col) {
+  const pr = Math.round(player.row), pc = Math.round(player.col);
+
+  // Check cherry first
+  if (cherry.active && pr === cherry.row && pc === cherry.col) {
+    cherry.active = false;
+    cherrySpawnTimer = 15 + Math.random() * 10;
     player.score++;
     updateScoreboard();
-    
-    // Start catch animation
-    startCatchAnimation(player);
-    
+    playCherrySound();
     if (player.score >= WIN_SCORE) {
       gameOver = true;
       playWinSound();
       msgEl.textContent = `${player.name} wins the game! 🎉`;
+      return true;
+    }
+    msgEl.textContent = `${player.name} grabbed a cherry! 🍒 (+1 bonus)`;
+  }
+
+  // Check mouse
+  if (pr === mouse.row && pc === mouse.col) {
+    const golden = mouseGolden;
+    const points = golden ? 2 : 1;
+    player.score += points;
+    mouseGolden = false;
+    mouseGoldenSpawnTimer = 18 + Math.random() * 14;
+    updateScoreboard();
+    startCatchAnimation(player);
+
+    if (player.score >= WIN_SCORE) {
+      gameOver = true;
+      playWinSound();
+      msgEl.textContent = `${player.name} wins the game! 🎉`;
+    } else if (golden) {
+      playGoldenCatchSound();
+      msgEl.textContent = `${player.name} caught GOLDEN Jerry! ⭐ (+2!)`;
+      setTimeout(() => { if (!gameOver) { placeMouse(); msgEl.textContent = 'Chase the mouse!'; } }, 1200);
     } else {
       playNomSound();
       msgEl.textContent = `${player.name} caught the mouse! (+1)`;
-      setTimeout(() => {
-        if (!gameOver) {
-          placeMouse();
-          msgEl.textContent = 'Chase the mouse!';
-        }
-      }, 1200);
+      setTimeout(() => { if (!gameOver) { placeMouse(); msgEl.textContent = 'Chase the mouse!'; } }, 1200);
     }
     return true;
   }
@@ -659,23 +919,23 @@ function checkMouseCaught(player) {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawBoard();
+  drawCherry();
   drawMouse();
+  drawTom();
   drawPlayer(pauli, pauliAnim);
   drawPlayer(semi, semiAnim);
-  
+
   // Draw catch animation
   if (catchAnimation) {
     drawCatchAnimation();
   }
-  
+
   // Draw urgency mode indicator
   if (urgencyMode) {
     const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.008);
     ctx.strokeStyle = `rgba(255, 50, 50, ${0.6 + pulse * 0.4})`;
     ctx.lineWidth = 8;
     ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
-    
-    // "URGENCY MODE" text
     ctx.save();
     ctx.fillStyle = `rgba(255, 50, 50, ${0.7 + pulse * 0.3})`;
     ctx.font = 'bold 20px sans-serif';
@@ -843,7 +1103,23 @@ function drawMouse() {
   const size = CELL * 0.5;
 
   ctx.globalAlpha = alpha;
-  
+
+  // Golden Jerry: spinning star glow
+  if (mouseGolden) {
+    const glow = 0.45 + 0.35 * Math.sin(Date.now() * 0.01);
+    ctx.globalAlpha = alpha * glow;
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath(); ctx.arc(px, py, size * 1.25, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      const a = Date.now() * 0.002 + i * Math.PI * 2 / 5;
+      const sr = size * 1.45;
+      ctx.fillStyle = '#ffee44';
+      ctx.globalAlpha = alpha * (0.5 + 0.4 * Math.sin(Date.now() * 0.01 + i));
+      ctx.beginPath(); ctx.arc(px + Math.cos(a)*sr, py + Math.sin(a)*sr, 3.5, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = alpha;
+  }
+
   // Countdown indicator
   if (mouseTimer <= 3 && !mouseDisappearing && !catchAnimation) {
     const warningAlpha = 0.3 + Math.sin(mouseTimer * 8) * 0.2;
@@ -855,9 +1131,9 @@ function drawMouse() {
     ctx.stroke();
     ctx.globalAlpha = alpha;
   }
-  
+
   const grad = ctx.createRadialGradient(px, py, 0, px, py, size);
-  grad.addColorStop(0, 'rgba(255, 220, 100, 0.3)');
+  grad.addColorStop(0, mouseGolden ? 'rgba(255,215,0,0.5)' : 'rgba(255, 220, 100, 0.3)');
   grad.addColorStop(1, 'rgba(255, 220, 100, 0)');
   ctx.fillStyle = grad;
   ctx.beginPath();
@@ -998,6 +1274,40 @@ function gameLoop(timestamp) {
     }
   }
 
+  // Tom AI
+  updateTom(dt);
+
+  // Cherry spawn / expiry
+  if (gameStarted && !gameOver) {
+    if (cherry.active) {
+      cherryTimer -= dt;
+      if (cherryTimer <= 0) {
+        cherry.active = false;
+        cherrySpawnTimer = 12 + Math.random() * 10;
+      }
+    } else {
+      cherrySpawnTimer -= dt;
+      if (cherrySpawnTimer <= 0) placeCherry();
+    }
+  }
+
+  // Golden Jerry spawn / expiry
+  if (gameStarted && !gameOver) {
+    if (mouseGolden) {
+      mouseGoldenTimer -= dt;
+      if (mouseGoldenTimer <= 0) {
+        mouseGolden = false;
+        mouseGoldenSpawnTimer = 18 + Math.random() * 14;
+      }
+    } else {
+      mouseGoldenSpawnTimer -= dt;
+      if (mouseGoldenSpawnTimer <= 0) {
+        mouseGolden = true;
+        mouseGoldenTimer = 5 + Math.random() * 3;
+      }
+    }
+  }
+
   // Random meows
   if (!gameOver) {
     meowTimer -= dt;
@@ -1028,6 +1338,14 @@ function initGame() {
   mouseDisappearing = false;
   urgencyMode = false;
   urgencyModeTimer = 5;
+  tomActive = false;
+  tomAnim = { active: false, shakeTime: 0, shakeDir: {dr:0, dc:0} };
+  tomMoveTimer = 3;
+  cherry.active = false;
+  cherrySpawnTimer = 18;
+  mouseGolden = false;
+  mouseGoldenTimer = 0;
+  mouseGoldenSpawnTimer = 22;
   catchAnimation = null;
   updateScoreboard();
   msgEl.textContent = 'Press any key to start!';
@@ -1061,7 +1379,7 @@ function initGame() {
   pauli.row = p1.row; pauli.col = p1.col;
 
   // Place Semi reachable from Pauli via ricochet
-  const pauliReach = ricochetReachable(pauli.row, pauli.col, -1, -1);
+  const pauliReach = ricochetReachable(pauli.row, pauli.col, []);
   const semiCandidates = [];
   const pauliKey = cellKey(pauli.row, pauli.col);
   for (const k of pauliReach) {
@@ -1081,6 +1399,7 @@ function initGame() {
   }
 
   placeMouse();
+  placeTom();
 }
 
 function restartGame() {
